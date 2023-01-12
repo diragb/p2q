@@ -1,7 +1,7 @@
 {
   "name": "p2q",
-  "version": "1.0.0",
-  "description": "Lightweight inter-component communication for React, Solid, etc.",
+  "version": "1.1.0",
+  "description": "Lightweight, cross-component, cross-context data and state sharing for React, Solid, etc.",
   "main": "index.js",
   "types": "index.d.ts",
   "author": "Dirag Biswas (https://github.com/diragb)",
@@ -24,7 +24,11 @@
   "keywords": [
     "data",
     "rxjs",
-    "react"
+    "redux",
+    "react",
+    "thunk",
+    "state",
+    "state-management"
   ],
   "devDependencies": {
     "ts-node": "^10.9.1",
