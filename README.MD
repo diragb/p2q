@@ -4,95 +4,175 @@
 [![npm downloads](https://img.shields.io/npm/dm/p2q.svg?style=flat-square)](https://www.npmjs.com/package/p2q)
 [![sponsors](https://img.shields.io/github/sponsors/diragb)](https://github.com/sponsors/diragb)
 
-Lightweight, cross-component, cross-context data and state sharing for React, Solid, etc.
+Lightweight state management library for Next, React, Solid, etc.
 
-- Share data between components on the webapp, across tabs and windows
+- Share data between components
 - Maintain shared state and listen for live updates
-- Components can query other components for answers
 
 # Installation
 ```bash
-npm i p2q
+yarn add p2q
 ```
 
 # Usage
-## React
-In `App.jsx`
-```jsx
-import p2q from 'p2q'
+## `p2q.ts`
 
-const store = p2q.createStore({
-  hello: ''
+Initialize P2Q with the default state.
+```tsx
+import P2Q from 'p2q'
+
+export const p2q = new P2Q({
+  user: {
+    isAuthenticated: false,
+    username: '',
+  },
+  form: {
+    emailAddress: '',
+    city: '',
+  }
 })
 ```
 
-In `ComponentA.jsx`
-```jsx
-import p2q from 'p2q'
+## `UserProfile.tsx`
 
-const ComponentA = (props) => {
-  const ID = 'Component-A'
-  const A = p2q.register(ID)
-  const storeSnapshot = p2q.getStore()
+Add an event listener for the `user` topic.
+```tsx
+import { useState } from 'react'
+import p2q from '@/p2q'
+
+const UserProfile = () => {
+  const [userState, setUserState] = useState(p2q.getTopic('user'))
+
+  // State updated by other components.
+  const onStateUpdate = (newUserState) => {
+    console.log('userState has been updated!', newUserState)
+    setUserState(newUserState)
+  }
 
   useEffect(() => {
-    // Reacts to broadcasts and direct messages to this component
-    A.listen((from, data) => {
-      console.log(from, data)
-    })
-
-    // Sets store across all components
-    p2q.setStore({ ...storeSnapshot, hello: 'there' })
-
-    // Sets store across all contexts (webapp, tabs, windows)
-    p2q.setStore({ ...storeSnapshot, hello: 'world!' }, { global: true })
-
-    A.setupResponseHandler((respondingTo: ID) => {
-      if (ID === 'Component-A') A.tell(respondingTo, true)
-      else A.tell(respondingTo, false)
-    })
+    p2q.addListenerToTopic('user', onStateUpdate)
 
     return () => {
-      A.unsubscribe()
+      p2q.removeListenerFromTopic('user', onStateUpdate)
     }
-  })
+  }, [])
 }
 ```
 
-In `ComponentB.jsx`
-```jsx
-import p2q from 'p2q'
+## `LoginButton.tsx`
 
-const ComponentB = (props) => {
-  const B = p2q.register('Component-B')
-  const [ store, setStore ] = useState(p2q.getStore())
+Toggle `isAuthenticated` on button click.
+```tsx
+import p2q from '@/p2q'
 
-  useEffect(() => {
-    // Reacts to changes in store
-    B.listenToStore(setStore)
-
-    B.tell('Component-A', 'This message will be sent to Component A')
-    B.broadcast('This message will be broadcasted to all registered components')
-    B.broadcast('This message will be broadcasted to all registered components across all contexts (webapp, tabs, windows)', { global: true })
-    
-    // Start listening for responses to the question we will ask..
-    B.listen((from, data) => {
-      if (data === true) console.log('Component A exists!')
-    })
-    // Ask all components if they are Component A
-    B.ask()
-
-    return () => {
-      B.unsubscribe()
+const LoginButton = () => {
+  const toggleAuthenticated = (userState) => {
+    return {
+      ...userState,
+      isAuthenticated: !userState.isAuthenticated,
     }
-  })
+  }
+
+  const onButtonClick = () => {
+    p2q.updateTopic('ID', toggleAuthenticated)
+  }
 }
 ```
 
-# [Why](https://i.kym-cdn.com/photos/images/original/002/414/481/df9.jpg)
+# API
 
-# Notes
-I do not recommend the usage of this package for big applications, because Redux works best for state-management at that point. But if you're building a small application and don't really care enough, or Redux seems like overkill but you really need X-Component data sharing and state management, then you can give this a try. Indian developers can refer to [this handy infographic](https://i.redd.it/9513a9lrod371.jpg).
+## addListenerToStore
+`(callback: Callback, options: Options) => void`
+
+Adds an event listener to the store, watches for global state updates.
+
+### options
+`silentErrors?: boolean` - Does not throw errors, and only exist quietly in case an exception arises.
+
+## removeListenerFromStore
+`(callback: Callback, options: Options) => void`
+
+Removes an event listener from the store.
+
+### options
+`silentErrors?: boolean` - Does not throw errors, and only exist quietly in case an exception arises.
+
+## addListenerToTopic
+`(ID: string, callback: Callback, options?: Options) => void`
+
+Adds an event listener to a topic, by passing its ID, an watches for updates to the topic.
+
+### options
+`silentErrors?: boolean` - Does not throw errors, and only exist quietly in case an exception arises.
+
+`ensure?: boolean` - If the topic does not exist, then it creates it and initializes it with an empty object.
+
+## removeListenerFromTopic
+`(ID: string, callback: Callback, options?: Options) => void`
+
+Removes an event listener from a topic.
+
+### options
+`silentErrors?: boolean` - Does not throw errors, and only exist quietly in case an exception arises.
+
+## getStore
+`(topicID?: string, options?: Options) => Store | Topic`
+
+Fetches the latest state of the global store, or a particular topic (if `topicID` is passed).
+
+### options
+`silentErrors?: boolean` - Does not throw errors, and only exist quietly in case an exception arises.
+
+## getTopic
+`(topicID: string, options?: Options) => Topic`
+
+Fetches the latest state of a topic.
+
+### options
+`silentErrors?: boolean` - Does not throw errors, and only exist quietly in case an exception arises.
+
+## createTopic
+`(ID: string, initialTopic?: Object, options?: Options) => Topic`
+
+Creates a new topic with the `ID` and initializes it with `initialTopic`, if passed.
+
+### options
+`silentErrors?: boolean` - Does not throw errors, and only exist quietly in case an exception arises.
+
+`overwrite?: boolean` - If the topic already exists, then it overwrites it with the `initialTopic`.
+
+## updateTopic
+`(ID: string, mutator: Callback, options: Options) => Topic`
+
+Updates a topic with the `ID` (if present), by running the `mutator` function passed to it.
+
+### options
+`silentErrors?: boolean` - Does not throw errors, and only exist quietly in case an exception arises.
+
+`ensure: boolean` - If the topic that is being updated does not exist, then it creates it and initializes it with an empty object.
+
+## deleteTopic
+`(ID: string, options?: Options) => Topic`
+
+Deletes a topic with the `ID`. Throws an error if the topic does not exist. On deletion, sends `undefined` to all the attached event listeners.
+
+### options
+`silentErrors?: boolean` - Does not throw errors, and only exist quietly in case an exception arises.
+
+## resetTopic
+`(ID: string, options?: Options) => Topic`
+
+Resets a topic with the `ID` to its default state. Throws an error if the topic does not exist.
+
+### options
+`silentErrors?: boolean` - Does not throw errors, and only exist quietly in case an exception arises.
+
+`ensure?: boolean` - If the topic that is being reset does not have a default state, then it creates it and initializes it with an empty object.
+
+`overrideDefaultTopicWith?: Object` - Resets the topic to this state, does not matter if the default state exists or not.
+
+# Philosophy
+`p2q` has a concept of **topics**, which are essentially an objects inside the **store** object. The language type of **topic** must always be an `Object` (e.g. arrays, functions, objects, regexes, new Number(0), and new String('')).
 
 ## License
 MIT
