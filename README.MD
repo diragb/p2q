@@ -4,10 +4,11 @@
 [![npm downloads](https://img.shields.io/npm/dm/p2q.svg?style=flat-square)](https://www.npmjs.com/package/p2q)
 [![sponsors](https://img.shields.io/github/sponsors/diragb)](https://github.com/sponsors/diragb)
 
-Lightweight state management library for Next, React, Solid, etc.
+Lightweight state management, local persistence, and synchronization library for Next, React, Solid, etc.
 
-- Share data between components
-- Maintain shared state and listen for live updates
+- Share state between components and various contexts.
+- Maintain shared state and listen for live updates.
+- Persist the state locally.
 
 # Installation
 ```bash
@@ -37,11 +38,11 @@ export const p2q = new P2Q({
 
 Add an event listener for the `user` topic.
 ```tsx
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import p2q from '@/p2q'
 
 const UserProfile = () => {
-  const [userState, setUserState] = useState(p2q.getTopic('user'))
+  const [userState, setUserState] = useState(p2q.topic.get('user'))
 
   // State updated by other components.
   const onStateUpdate = (newUserState) => {
@@ -50,10 +51,10 @@ const UserProfile = () => {
   }
 
   useEffect(() => {
-    p2q.addListenerToTopic('user', onStateUpdate)
+    p2q.topic.addListener('user', onStateUpdate)
 
     return () => {
-      p2q.removeListenerFromTopic('user', onStateUpdate)
+      p2q.topic.removeListener('user', onStateUpdate)
     }
   }, [])
 }
@@ -74,105 +75,203 @@ const LoginButton = () => {
   }
 
   const onButtonClick = () => {
-    p2q.updateTopic('ID', toggleAuthenticated)
+    p2q.topic.update('ID', toggleAuthenticated)
   }
 }
 ```
 
+# Philosophy
+`p2q` has a concept of **topics**, which are essentially an objects inside the **store** object. The language type of **topic** must always be an `Object` (e.g. arrays, functions, objects, regexes, new Number(0), and new String('')).
+
 # API
 
-## addListenerToStore
-`(callback: Callback, options: Options) => void`
+## P2Q
+`const p2q = new P2Q(initialState?: any, options?: P2QOptions)`
 
-Adds an event listener to the store, watches for global state updates.
+Create a new p2q instance with an optional initial state.
 
-### options
-`silentErrors?: boolean` - Does not throw errors, and only exist quietly in case an exception arises.
+### P2QOptions
+`persistLocally?: boolean` - Persist the state locally by using asynchronous storage (IndexedDB or WebSQL).
 
-## removeListenerFromStore
-`(callback: Callback, options: Options) => void`
+`crossOriginCommunication?: CrossOriginCommunication` - Sets up cross-origin communication mode. All updates to the state are broadcasted using `window.parent.postMessage` and any changes from the outer context are intercepted using `window.parent.addEventListener('message', ...)`. Useful for communication between P2Q clients between different contexts (across tabs, iframes, and so on).
 
-Removes an event listener from the store.
+#### CrossOriginCommunication
+- `id: string` - Unique ID for the P2Q client, this will help your other P2Q client identify what messages to intercept.
+- `enabled: boolean` - Cross Origin Communication will only work if this is enabled.
+- `targetOrigin: string | undefined` - The origin to post messages to. Defaults to `*`.
+- `acceptableIDs: Set<string>` - The set of valid IDs of P2Q clients in outer contexts. P2Q will only parse the messages of clients that have IDs in this set.
 
-### options
-`silentErrors?: boolean` - Does not throw errors, and only exist quietly in case an exception arises.
+## store
 
-## addListenerToTopic
-`(ID: string, callback: Callback, options?: Options) => void`
-
-Adds an event listener to a topic, by passing its ID, an watches for updates to the topic.
-
-### options
-`silentErrors?: boolean` - Does not throw errors, and only exist quietly in case an exception arises.
-
-`ensure?: boolean` - If the topic does not exist, then it creates it and initializes it with an empty object.
-
-## removeListenerFromTopic
-`(ID: string, callback: Callback, options?: Options) => void`
-
-Removes an event listener from a topic.
-
-### options
-`silentErrors?: boolean` - Does not throw errors, and only exist quietly in case an exception arises.
-
-## getStore
+### get
 `(topicID?: string, options?: Options) => Store | Topic`
 
 Fetches the latest state of the global store, or a particular topic (if `topicID` is passed).
 
-### options
+#### options
 `silentErrors?: boolean` - Does not throw errors, and only exist quietly in case an exception arises.
 
-## getTopic
+### addListener
+`(callback: Callback, options: Options) => void`
+
+Adds an event listener to the store, watches for global state updates.
+
+#### options
+- `silentErrors?: boolean`
+
+### removeListener
+`(callback: Callback, options: Options) => void`
+
+Removes an event listener from the store.
+
+#### options
+- `silentErrors?: boolean`
+
+## topic
+
+### get
 `(topicID: string, options?: Options) => Topic`
 
 Fetches the latest state of a topic.
 
-### options
-`silentErrors?: boolean` - Does not throw errors, and only exist quietly in case an exception arises.
+#### options
+- `silentErrors?: boolean`
 
-## createTopic
+### create
 `(ID: string, initialTopic?: Object, options?: Options) => Topic`
 
 Creates a new topic with the `ID` and initializes it with `initialTopic`, if passed.
 
-### options
-`silentErrors?: boolean` - Does not throw errors, and only exist quietly in case an exception arises.
+#### options
+- `silentErrors?: boolean`
 
-`overwrite?: boolean` - If the topic already exists, then it overwrites it with the `initialTopic`.
+- `overwrite?: boolean` - If the topic already exists, then it overwrites it with the `initialTopic`.
 
-## updateTopic
+### update
 `(ID: string, mutator: Callback, options: Options) => Topic`
 
 Updates a topic with the `ID` (if present), by running the `mutator` function passed to it.
 
-### options
-`silentErrors?: boolean` - Does not throw errors, and only exist quietly in case an exception arises.
+#### options
+- `silentErrors?: boolean`
 
-`ensure: boolean` - If the topic that is being updated does not exist, then it creates it and initializes it with an empty object.
+- `ensure: boolean` - If the topic that is being updated does not exist, then it creates it and initializes it with an empty object.
 
-## deleteTopic
+### delete
 `(ID: string, options?: Options) => Topic`
 
 Deletes a topic with the `ID`. Throws an error if the topic does not exist. On deletion, sends `undefined` to all the attached event listeners.
 
-### options
-`silentErrors?: boolean` - Does not throw errors, and only exist quietly in case an exception arises.
+#### options
+- `silentErrors?: boolean`
 
-## resetTopic
+### reset
 `(ID: string, options?: Options) => Topic`
 
 Resets a topic with the `ID` to its default state. Throws an error if the topic does not exist.
 
-### options
-`silentErrors?: boolean` - Does not throw errors, and only exist quietly in case an exception arises.
+#### options
+- `silentErrors?: boolean`
 
-`ensure?: boolean` - If the topic that is being reset does not have a default state, then it creates it and initializes it with an empty object.
+- `ensure?: boolean` - If the topic that is being reset does not have a default state, then it creates it and initializes it with an empty object.
 
-`overrideDefaultTopicWith?: Object` - Resets the topic to this state, does not matter if the default state exists or not.
+- `overrideDefaultTopicWith?: Object` - Resets the topic to this state, does not matter if the default state exists or not.
 
-# Philosophy
-`p2q` has a concept of **topics**, which are essentially an objects inside the **store** object. The language type of **topic** must always be an `Object` (e.g. arrays, functions, objects, regexes, new Number(0), and new String('')).
+### addListener
+`(ID: string, callback: Callback, options?: Options) => void`
+
+Adds an event listener to a topic, by passing its ID, an watches for updates to the topic.
+
+#### options
+- `silentErrors?: boolean`
+
+- `ensure?: boolean` - If the topic does not exist, then it creates it and initializes it with an empty object.
+
+### removeListener
+`(ID: string, callback: Callback, options?: Options) => void`
+
+Removes an event listener from a topic.
+
+#### options
+- `silentErrors?: boolean`
+
+## crossOrigin
+
+### `id`
+
+#### get
+`() => string`
+
+Fetches the current ID of the P2Q client.
+
+#### set
+`(ID: string, options?: Options) => string | undefined`
+
+Sets the ID of the P2Q client.
+
+##### options
+- `silentErrors?: boolean`
+
+### `enable`
+`() => void`
+
+Enables Cross Origin Communication.
+
+### `disable`
+`() => void`
+
+Disables Cross Origin Communication.
+
+### `targetOrigin`
+
+#### get
+`() => string`
+
+Fetches the current `targetOrigin` of the P2Q client.
+
+#### set
+`(targetOrigin: string, options?: Options) => string | undefined`
+
+Sets the `targetOrigin` of the P2Q client.
+
+##### options
+- `silentErrors?: boolean`
+
+### `acceptableIDs`
+
+#### get
+`() => string`
+
+Fetches the set of acceptable P2Q IDs whose messages will be read.
+
+#### set
+`(mutator: (acceptableIDs: Set<string>) => Set<string>, options?: Options) => string`
+
+Sets acceptable P2Q IDs, pass a callback/mutator to the `set` function.
+
+##### options
+- `silentErrors?: boolean`
+
+#### add
+`(ID: string, options?: Options) => string`
+
+Adds a new ID to the set of acceptable P2Q IDs.
+
+##### options
+- `silentErrors?: boolean`
+
+#### delete
+`(ID: string, options?: Options) => string`
+
+Deletes an ID from the set of acceptable P2Q IDs.
+
+##### options
+- `silentErrors?: boolean`
+
+### `removeListener`
+`() => void`
+
+Removes the event listener for Cross Origin Communication. **Once removed, it cannot be attached back.**
 
 ## License
 MIT

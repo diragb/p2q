@@ -1,6 +1,6 @@
 {
   "name": "p2q",
-  "version": "2.0.0",
+  "version": "1.0.0",
   "description": "Lightweight state management library for Next, React, Solid, etc.",
   "main": "build/index.js",
   "types": "build/index.d.ts",
@@ -38,6 +38,7 @@
   "license": "MIT",
   "dependencies": {
     "immer": "^10.0.3",
+    "localforage": "^1.10.0",
     "lodash": "^4.17.21"
   }
 }
